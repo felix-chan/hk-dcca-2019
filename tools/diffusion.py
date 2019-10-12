@@ -11,8 +11,21 @@ class DiffVec(object):
     def __init__(self, target):
         self._target = target
     
-    def cal_vec(self, x0, y0, x, y): 
-        return 0, 0
+    def _cal_magnitude(self, displacement):
+        magnitude = 0
+        return magnitude
+    
+    def cal_vec(self, x0, y0, x, y):
+        # Displacement between two points
+        dx_dy = np.array([x - x0, y - y0])
+        displacement = np.sqrt(np.sum(dx_dy**2))
+        # Normalise
+        direction = dx_dy / displacement
+        # Magnitude of vector
+        magnitude = self._cal_magnitude(displacement)
+        # Scale vector
+        vx_vy = direction * magnitude
+        return vx_vy
 
 # Tanh
 class DiffVecTanh(DiffVec):
@@ -20,39 +33,31 @@ class DiffVecTanh(DiffVec):
         DiffVec.__init__(self, target)
         self._a = a
     
-    def cal_vec(self, x0, y0, x, y):
-        dx, dy= x - x0, y - y0
-        displacement = np.sqrt(dx**2 + dy**2)
-        fac = np.tanh(-self._a * (displacement - self._target))
-        vx, vy = dx * fac, dy * fac
-        return vx, vy
+    def _cal_magnitude(self, displacement):
+        d = displacement - self._target
+        magnitude = np.tanh(-self._a * d)
+        return magnitude
 
 # Exponential
-class DiffVecExpExpand(DiffVec):
-    def __init__(self, target, l=1):
-        DiffVec.__init__(self, target)
-        self._l = l
-    
-    def cal_vec(self, x0, y0, x, y):
-        dx_dy = np.array([x - x0, y - y0])
-        displacement = np.sqrt(np.sum(dx_dy**2))
-        d = displacement - self._target
-        fac = np.exp(-self._l * d)
-        vx_vy = dx_dy * fac
-        return vx_vy
-
 class DiffVecExp(DiffVec):
     def __init__(self, target, l=1):
         DiffVec.__init__(self, target)
         self._l = l
     
-    def cal_vec(self, x0, y0, x, y):
-        dx, dy= x - x0, y - y0
-        displacement = np.sqrt(dx**2 + dy**2)
-        fac = np.exp(-self._l * (displacement - self._target)) - 1
-        fac /= displacement
-        vx, vy = dx * fac, dy * fac
-        return vx, vy
+    def _cal_magnitude(self, displacement):
+        d = displacement - self._target
+        magnitude = np.exp(-self._l * d)
+        return magnitude
+
+class DiffVecExp1(DiffVec):
+    def __init__(self, target, l=1):
+        DiffVec.__init__(self, target)
+        self._l = l
+    
+    def _cal_magnitude(self, displacement):
+        d = displacement - self._target
+        magnitude = np.exp(-self._l * d) - 1
+        return magnitude
 
 # Linear
 class DiffVecLinear(DiffVec):
@@ -61,15 +66,24 @@ class DiffVecLinear(DiffVec):
         self._s1 = s1
         self._s2 = s2
     
-    def cal_vec(self, x0, y0, x, y):
-        dx, dy= x - x0, y - y0
-        displacement = np.sqrt(dx**2 + dy**2)
-        if displacement < self._target:
-            fac = -self._s1 * (displacement - self._target)
-        else:
-            fac = -self._s2 * (displacement - self._target)
-        vx, vy = dx * fac, dy * fac
-        return vx, vy
+    def _cal_magnitude(self, displacement):
+        d = displacement - self._target
+        magnitude = -np.where(d < 0, self._s1, self._s2) * d
+        return magnitude
+
+class DiffVecLinearCap(DiffVec):
+    def __init__(self, target, s1=0.1, s2=0.01, c1=-np.inf, c2=-0.1):
+        DiffVec.__init__(self, target)
+        self._s1 = s1
+        self._s2 = s2
+        self._c1 = c1
+        self._c2 = c2
+    
+    def _cal_magnitude(self, displacement):
+        d = displacement - self._target
+        magnitude = np.where(d < 0, -self._s1, -self._s2) * d
+        magnitude = np.where(d < 0, np.max(magnitude, self._c1), np.min(magnitude, self._c2))
+        return magnitude
 
 
 #%%
