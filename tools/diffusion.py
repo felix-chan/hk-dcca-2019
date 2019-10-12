@@ -17,7 +17,7 @@ class DiffVec(object):
     
     def cal_vec(self, x0, y0, x, y):
         # Displacement between two points
-        dx_dy = np.array([x - x0, y - y0])
+        dx_dy = np.array([x0 - x, y0 - y])
         displacement = np.sqrt(np.sum(dx_dy**2))
         # Normalise
         direction = dx_dy / displacement
@@ -244,6 +244,45 @@ class DiffSimUnb(DiffSim):
         update_vec = df\
             .groupby(['id0'], as_index=False)\
             .agg({'dx': np.sum, 'dy': np.sum})
+        if self._debug:
+            print('>>>> _cal_update_vec(): update_vec.head()')
+            print(update_vec.head())
+        # Tidy up
+        update_vec = update_vec.rename(columns={'id0': 'id'})
+        update_vec = update_vec.sort_values(by=['id'])
+        update_vec = update_vec.reset_index(drop=True)
+        self._update_vec = update_vec
+
+
+# Displacement Bounded
+class DiffSimDB(DiffSim):
+    def __init__(self, particles, bonding, diff_func, alpha=0.3, tracking=0, debug=False):
+        DiffSim.__init__(self, particles, bonding, diff_func, tracking, debug)
+        self._alpha = alpha
+    
+    def _cal_update_vec(self, df):
+        vec = df.apply(
+            lambda row: self._diff_func[row['type']].cal_vec(row['x0'], row['y0'], row['x1'], row['y1']), 
+            axis=1
+        )
+        if self._debug:
+            print('>>>> _cal_update_vec(): vec.head()')
+            print(vec.head())
+        df['v_x'] = vec.str[0]
+        df['v_y'] = vec.str[1]
+        df['tolerance'] = np.sqrt((df['x1'].values - df['x0'].values)**2 + (df['y1'].values - df['y0'].values)**2)
+        if self._debug:
+            print('>>>> _cal_update_vec(): df.head()')
+            print(df.head())
+        update_vec = df\
+            .groupby(['id0'], as_index=False)\
+            .agg({'v_x': np.sum, 'v_y': np.sum, 'tolerance': np.min})
+        # Constraints
+        update_vec['v_norm'] = np.sqrt(update_vec['v_x'].values**2 + update_vec['v_y'].values**2)
+        update_vec['fac'] = self._alpha * update_vec['tolerance'].values / update_vec['v_norm'].values
+        update_vec['fac'] = np.where(update_vec['fac'].values > 1, 1, update_vec['fac'].values)
+        update_vec['dx'] = update_vec['v_x'] * update_vec['fac'].values
+        update_vec['dy'] = update_vec['v_y'] * update_vec['fac'].values
         if self._debug:
             print('>>>> _cal_update_vec(): update_vec.head()')
             print(update_vec.head())
