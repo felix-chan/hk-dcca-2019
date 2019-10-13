@@ -27,6 +27,7 @@ class DiffVec(object):
         vx_vy = direction * magnitude
         return vx_vy
 
+
 # Tanh
 class DiffVecTanh(DiffVec):
     def __init__(self, target, a=1):
@@ -37,6 +38,7 @@ class DiffVecTanh(DiffVec):
         d = displacement - self._target
         magnitude = np.tanh(-self._a * d)
         return magnitude
+
 
 # Exponential
 class DiffVecExp(DiffVec):
@@ -49,6 +51,7 @@ class DiffVecExp(DiffVec):
         magnitude = np.exp(-self._l * d)
         return magnitude
 
+
 class DiffVecExp1(DiffVec):
     def __init__(self, target, l=1):
         DiffVec.__init__(self, target)
@@ -58,6 +61,19 @@ class DiffVecExp1(DiffVec):
         d = displacement - self._target
         magnitude = np.exp(-self._l * d) - 1
         return magnitude
+
+
+class DiffVecDoubleExp(DiffVec):
+    def __init__(self, target, l1=1, l2=0.5):
+        DiffVec.__init__(self, target)
+        self._l1 = l1
+        self._l2 = l2
+    
+    def _cal_magnitude(self, displacement):
+        d = displacement - self._target
+        magnitude = np.exp(-self._l1 * d) - np.exp(-self._l2 * d)
+        return magnitude
+
 
 # Linear
 class DiffVecLinear(DiffVec):
@@ -84,6 +100,25 @@ class DiffVecLinearCap(DiffVec):
         magnitude = np.where(d < 0, -self._s1, -self._s2) * d
         magnitude = np.where(d < 0, np.max(magnitude, self._c1), np.min(magnitude, self._c2))
         return magnitude
+
+
+# Inverse
+class DiffVecInv(DiffVec):
+    def __init__(self, target):
+        DiffVec.__init__(self, target)
+    
+    def _cal_magnitude(self, displacement):
+        magnitude = 1 / (displacement + self._target)
+        return magnitude
+
+class DiffVecInv1(DiffVec):
+    def __init__(self, target):
+        DiffVec.__init__(self, target)
+    
+    def _cal_magnitude(self, displacement):
+        magnitude = 1 / (displacement + self._target) - 1 / self._target
+        return magnitude
+
 
 
 #%%
@@ -271,6 +306,7 @@ class DiffSimDB(DiffSim):
         df['v_x'] = vec.str[0]
         df['v_y'] = vec.str[1]
         df['tolerance'] = np.sqrt((df['x1'].values - df['x0'].values)**2 + (df['y1'].values - df['y0'].values)**2)
+        df['tolerance'] *= self._alpha
         if self._debug:
             print('>>>> _cal_update_vec(): df.head()')
             print(df.head())
@@ -279,7 +315,12 @@ class DiffSimDB(DiffSim):
             .agg({'v_x': np.sum, 'v_y': np.sum, 'tolerance': np.min})
         # Constraints
         update_vec['v_norm'] = np.sqrt(update_vec['v_x'].values**2 + update_vec['v_y'].values**2)
-        update_vec['fac'] = self._alpha * update_vec['tolerance'].values / update_vec['v_norm'].values
+        update_vec['fac'] = np.divide(
+            update_vec['tolerance'].values, 
+            update_vec['v_norm'].values, 
+            out=np.ones(update_vec.shape[0]), 
+            where=update_vec['v_norm'].values != 0
+        )
         update_vec['fac'] = np.where(update_vec['fac'].values > 1, 1, update_vec['fac'].values)
         update_vec['dx'] = update_vec['v_x'] * update_vec['fac'].values
         update_vec['dy'] = update_vec['v_y'] * update_vec['fac'].values
