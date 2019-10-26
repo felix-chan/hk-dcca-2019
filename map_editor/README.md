@@ -7,7 +7,8 @@ It is a map editor to fine-tune the position of region on map. The files inside 
 Run the following code to see the effect of editor:
 
 ```sh
-python -m http.server
+set FLASK_APP=main.py
+python -m flask run
 ```
 
 When the local web server is ready, access http://localhost:8000/

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>GeoJSON Map Editor</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" 
+    integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" 
+    crossorigin=""/>
+
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"
+    integrity="sha512-GffPMF3RvMeYyc1LWMHtK8EbPv0iNZ8/oTtHPx9/cc2ILxQ+u905qIwdpULaqDkyBKgOaB57QTMg7ztg8Jm2Og=="
+    crossorigin=""></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
+
+    <style>
+#mapPannel {
+    height: 90vh;
+    width: 60%;
+    float: left;
+    min-height: 400px;
+}
+#controlPanel {
+    width: 38%;
+    height: 90vh;
+    float: right;
+    background-color: #cccccc;
+}
+#working_ca{
+    background-color: #eeeeee;
+    padding: 0 1em;
+    color: #ff0000;
+}
+#moving_target{
+    background-color: #eeeeee;
+    padding: 0 1em;
+    color: #00a2ad;
+}
+    </style>
+</head>
+<body>
+    <div id="mapPannel">
+
+    </div>
+    <div id="controlPanel">
+        <h1>GeoJSON Map Editor</h1>
+        <p>District Code: <span id="working_ca">Not selected</span></p>
+        <p>Move to position: <span id="moving_target">No movement</span></p>
+        <p><input type="button" value="Move" id="move_btn"></p>
+        <p>Click the region first, and use the following keys to select the target position.</p>
+        <svg width="400" height="400">
+            <polygon points="350,200 275,329.9 125,329.9 50,200 125,70.1 275,70.1" style="fill:#ffffff;stroke:#000000;stroke-width:4" />
+            <text x="330" y="300" fill="black" font-size="40">D</text>
+            <text x="330" y="120" fill="black" font-size="40">E</text>
+            <text x="50" y="300" fill="black" font-size="40">A</text>
+            <text x="50" y="120" fill="black" font-size="40">Q</text>
+            <text x="185" y="50" fill="black" font-size="40">W</text>
+            <text x="185" y="380" fill="black" font-size="40">S</text>
+        </svg>
+    </div>
+    <script>
+var mymap = L.map('mapPannel').setView([22.3452154,114.1700345], 11);
+
+var working_CACODE = null;
+var selected_polygon = null;
+var current_xid = null;
+var current_yid = null;
+
+var xy_list = [];
+
+var x_moved = 0;
+var y_moved = 0;
+var circle_moved = null;
+var hex_layer = null;
+
+L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {"attribution": "Data by \u0026copy; \u003ca href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
+).addTo(mymap);
+
+function onEachFeature(feature, layer) {
+    //bind click
+    layer.on('click', function (e) {
+        // e = event
+        working_CACODE = e.target.feature.properties.CACODE;
+        $("#working_ca").html(working_CACODE);
+        $("#moving_target").html("No movement");
+        
+        var geom_box = e.target.feature.geometry;
+
+        if (selected_polygon !== null){
+            mymap.removeLayer(selected_polygon);
+            current_xid = null;
+            current_yid = null;
+        }
+        if (circle_moved !== null){
+            mymap.removeLayer(circle_moved);
+            x_moved = 0;
+            y_moved = 0;
+        }
+        var local_cord = geom_box.coordinates[0].map(x => [x[1], x[0]])
+        selected_polygon = L.polygon([local_cord], {color: 'yellow'}).addTo(mymap);
+        x_moved = 0;
+        y_moved = 0;
+        current_xid = e.target.feature.properties.xid;
+        current_yid = e.target.feature.properties.yid;
+    });
+
+}
+
+function movebox(x,y){
+    x_moved += x;
+    y_moved += y;
+
+    if (circle_moved !== null){
+        mymap.removeLayer(circle_moved);
+    }
+
+    if(x_moved !== 0 || y_moved !== 0){
+        var new_x = current_xid + x_moved;
+        var new_y = current_yid + y_moved;
+        
+        var new_latlong = xy_list[new_x][new_y];
+        circle_moved = L.circle([new_latlong[0], new_latlong[1]], {
+            color: 'green',
+            fillColor: 'green',
+            fillOpacity: 0.5,
+            radius: 500
+        }).addTo(mymap);
+        $("#moving_target").html('('+new_x+', '+new_y+')');
+    }else{
+        $("#moving_target").html('No movement');
+    }
+}
+
+function addJSON(data){
+    if (typeof(data) === 'string'){
+        json_data = JSON.parse(data);
+    }else{
+        json_data = data;
+    }
+
+    if (hex_layer !== null){
+        mymap.removeLayer(hex_layer);
+    }
+    
+    hex_layer = L.geoJSON(json_data, {
+        style: function (feature) {
+            return {color: '#ff0000'};
+        },
+        onEachFeature: onEachFeature
+    }).bindPopup(function (layer) {
+        return layer.feature.properties.description;
+    }).addTo(mymap);
+}
+
+function addGrid(x, y, geo_x, geo_y){
+    if(xy_list[x] === undefined){
+        xy_list[x] = [];
+    }
+    xy_list[x][y] = [geo_x, geo_y];
+}
+
+function loadGrid(data){
+    if (typeof(data) === 'string'){
+        json_data = JSON.parse(data);
+    }else{
+        json_data = data;
+    }
+    json_data.features.map(x => addGrid(
+        x.properties.xid,
+        x.properties.yid,
+        x.geometry.coordinates[1],
+        x.geometry.coordinates[0]
+    ));
+}
+
+$.ajax({
+    url: "./get_map/"
+}).done(function(data){
+    addJSON(data);
+});
+
+$.ajax({
+    url: "./hex_grid/"
+}).done(function(data){
+    loadGrid(data);
+});
+
+document.addEventListener('keydown', event => {
+    var key = event.key.toLocaleLowerCase();
+    
+    switch(key){
+        case 'a':
+            movebox(-1, -1);
+            break;
+        case 's':
+            movebox(0, -2);
+            break;
+        case 'd':
+            movebox(1, -1);
+            break;
+        case 'q':
+            movebox(-1, 1);
+            break;
+        case 'w':
+            movebox(0, 2);
+            break;
+        case 'e':
+            movebox(1,1);
+            break;
+    }
+});
+
+$("#move_btn").click(function(e){
+    var new_x = current_xid + x_moved;
+    var new_y = current_yid + y_moved;
+    $.post('/get_map/', {
+        from_x: current_xid, 
+        from_y: current_yid, 
+        to_x: new_x,
+        to_y: new_y
+        }).done(function(data){
+            if (circle_moved !== null){
+                mymap.removeLayer(circle_moved);
+                x_moved = 0;
+                y_moved = 0;
+                circle_moved = null;
+            }
+            if (selected_polygon !== null){
+                mymap.removeLayer(selected_polygon);
+                current_xid = null;
+                current_yid = null;
+                selected_polygon = null;
+            }
+            addJSON(data);
+        });
+});
+    </script>
+</body>
+</html>
