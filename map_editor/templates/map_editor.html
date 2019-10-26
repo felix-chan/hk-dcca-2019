@@ -16,17 +16,23 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
 
     <style>
+body {
+    background-color: #000000;
+    font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+    color: #eeeeee;
+}
 #mapPannel {
-    height: 90vh;
+    height: 98vh;
     width: 60%;
     float: left;
     min-height: 400px;
 }
 #controlPanel {
     width: 38%;
-    height: 90vh;
+    height: 94vh;
     float: right;
-    background-color: #cccccc;
+    background-color: #000000;
+    padding: 1% 1vh;
 }
 #working_ca{
     background-color: #eeeeee;
@@ -51,13 +57,13 @@
         <p><input type="button" value="Move" id="move_btn"></p>
         <p>Click the region first, and use the following keys to select the target position.</p>
         <svg width="400" height="400">
-            <polygon points="350,200 275,329.9 125,329.9 50,200 125,70.1 275,70.1" style="fill:#ffffff;stroke:#000000;stroke-width:4" />
-            <text x="330" y="300" fill="black" font-size="40">D</text>
-            <text x="330" y="120" fill="black" font-size="40">E</text>
-            <text x="50" y="300" fill="black" font-size="40">A</text>
-            <text x="50" y="120" fill="black" font-size="40">Q</text>
-            <text x="185" y="50" fill="black" font-size="40">W</text>
-            <text x="185" y="380" fill="black" font-size="40">S</text>
+                <polygon points="350,200 275,329.9 125,329.9 50,200 125,70.1 275,70.1" style="fill:#ffffff;stroke:#cccccc;stroke-width:4" />
+                <text x="330" y="300" fill="#cccccc" font-size="40">D</text>
+                <text x="330" y="120" fill="#cccccc" font-size="40">E</text>
+                <text x="50" y="300" fill="#cccccc" font-size="40">A</text>
+                <text x="50" y="120" fill="#cccccc" font-size="40">Q</text>
+                <text x="185" y="50" fill="#cccccc" font-size="40">W</text>
+                <text x="185" y="380" fill="#cccccc" font-size="40">S</text>
         </svg>
     </div>
     <script>
@@ -111,28 +117,37 @@ function onEachFeature(feature, layer) {
 }
 
 function movebox(x,y){
-    x_moved += x;
-    y_moved += y;
+    var new_x = current_xid + x_moved + x;
+    var new_y = current_yid + y_moved + y;
 
-    if (circle_moved !== null){
-        mymap.removeLayer(circle_moved);
-    }
+    if (xy_list[new_x][new_y] !== undefined){
+        x_moved += x;
+        y_moved += y;
 
-    if(x_moved !== 0 || y_moved !== 0){
-        var new_x = current_xid + x_moved;
-        var new_y = current_yid + y_moved;
-        
-        var new_latlong = xy_list[new_x][new_y];
-        circle_moved = L.circle([new_latlong[0], new_latlong[1]], {
-            color: 'green',
-            fillColor: 'green',
-            fillOpacity: 0.5,
-            radius: 500
-        }).addTo(mymap);
-        $("#moving_target").html('('+new_x+', '+new_y+')');
-    }else{
-        $("#moving_target").html('No movement');
+        if (circle_moved !== null){
+            mymap.removeLayer(circle_moved);
+        }
+
+        if(x_moved !== 0 || y_moved !== 0){
+            
+            var new_latlong = xy_list[new_x][new_y];
+            circle_moved = L.circle([new_latlong[0], new_latlong[1]], {
+                color: 'green',
+                fillColor: 'green',
+                fillOpacity: 0.5,
+                radius: 500
+            }).addTo(mymap);
+            $("#moving_target").html('('+new_x+', '+new_y+')');
+        }else{
+            $("#moving_target").html('No movement');
+        }
     }
+}
+
+function colorset(code){
+    var varcol = code.charCodeAt(0) - 65;
+    var colorset = ["#d11141", "#00b159", "#00aedb", "#f37735", "#ffc425"];
+    return colorset[varcol % 5];
 }
 
 function addJSON(data){
@@ -148,7 +163,8 @@ function addJSON(data){
     
     hex_layer = L.geoJSON(json_data, {
         style: function (feature) {
-            return {color: '#ff0000'};
+            var district_group = feature.properties.CACODE[0];
+            return {color: colorset(district_group)};
         },
         onEachFeature: onEachFeature
     }).bindPopup(function (layer) {
@@ -217,26 +233,31 @@ document.addEventListener('keydown', event => {
 $("#move_btn").click(function(e){
     var new_x = current_xid + x_moved;
     var new_y = current_yid + y_moved;
-    $.post('/get_map/', {
-        from_x: current_xid, 
-        from_y: current_yid, 
-        to_x: new_x,
-        to_y: new_y
-        }).done(function(data){
-            if (circle_moved !== null){
-                mymap.removeLayer(circle_moved);
-                x_moved = 0;
-                y_moved = 0;
-                circle_moved = null;
-            }
-            if (selected_polygon !== null){
-                mymap.removeLayer(selected_polygon);
-                current_xid = null;
-                current_yid = null;
-                selected_polygon = null;
-            }
-            addJSON(data);
-        });
+
+    if(xy_list[new_x][new_y] !== undefined){
+        $.post('/get_map/', {
+            from_x: current_xid, 
+            from_y: current_yid, 
+            to_x: new_x,
+            to_y: new_y
+            }).done(function(data){
+                if (circle_moved !== null){
+                    mymap.removeLayer(circle_moved);
+                    x_moved = 0;
+                    y_moved = 0;
+                    circle_moved = null;
+                }
+                if (selected_polygon !== null){
+                    mymap.removeLayer(selected_polygon);
+                    current_xid = null;
+                    current_yid = null;
+                    selected_polygon = null;
+                }
+                addJSON(data);
+            });
+    }else{
+        alert('Selected box out of boundary')
+    }
 });
     </script>
 </body>
