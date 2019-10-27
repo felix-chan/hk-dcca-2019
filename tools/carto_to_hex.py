@@ -1,5 +1,5 @@
 """
-Script to convert Catrogram geojson file to hexagon geojson file
+Script to convert Cartogram geojson file to hexagon geojson file
 
 Arguments:
  `-o` Output geojson file location
@@ -13,7 +13,7 @@ Arguments:
 
 e.g. 
 ```
-python catro_to_hex.py -o output.json -g grid.json -w 200 -p output.png input.json
+python carto_to_hex.py -o output.json -g grid.json -w 200 -p output.png input.json
 ```
 """
 
@@ -71,7 +71,7 @@ def gen_hex_points(r, min_x, min_y, max_x, max_y):
 
 # Read the input file
 default_args = {
-    '-o': 'hex_from_catro.geojson', # Output geojson file
+    '-o': 'hex_from_carto.geojson', # Output geojson file
     '-g': None, # Output baseline grid geojson file
     '-w': 800, # Hexagon size
     '-s': 'hk80', # Source grid standard
@@ -89,7 +89,7 @@ try:
     if len(args) > 0:
         input_file = args[0]
     else:
-        print('Please specific the input catrogram geojson file')
+        print('Please specific the input Cartogram geojson file')
         exit(1)
 except Exception as e:
     print(e)
@@ -97,7 +97,7 @@ except Exception as e:
 
 # Confirm the input parameters
 print("""
-Input catrogram geojson file: {ins}
+Input Cartogram geojson file: {ins}
 Output hexagon geojson file: {hex}
 Output grid geojson file: {grid}
 Hexagon width paragram: {wid}
