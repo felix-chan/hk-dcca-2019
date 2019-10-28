@@ -53,7 +53,8 @@ class torchDiffusion:
 
     def _cal_new_force(self, x1, x2, y1, y2, group, f_mat=1):
         distance = (x2 - x1)**2 + (y2 - y1)**2
-        force = (np.exp(1/(distance / f_mat + 0.5)) - 1)
+        # force = (np.exp(1/(distance / f_mat + 0.5)) - 1)
+        force = (torch.log((distance / f_mat) + 0.001) - 2) * -1
         net_x = (force / distance * (x1 - x2)).double()
         net_y = (force / distance * (y1 - y2)).double()
         
