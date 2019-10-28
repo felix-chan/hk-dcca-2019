@@ -115,7 +115,7 @@ class torchDiffusion:
             torch.from_numpy(point_comb['x1'].values),
             torch.from_numpy(point_comb['x2'].values),
             torch.from_numpy(point_comb['y1'].values),
-            torch.from_numpy(point_comb['y1'].values),
+            torch.from_numpy(point_comb['y2'].values),
             torch.from_numpy(point_comb['id'].values),
             self.pt_force
         )
