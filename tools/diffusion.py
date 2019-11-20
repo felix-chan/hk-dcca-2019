@@ -22,7 +22,12 @@ class DiffVec(object):
         dx_dy = np.array([x0 - x, y0 - y])
         displacement = np.sqrt(np.sum(dx_dy**2))
         # Normalise
-        direction = dx_dy / displacement
+        direction = np.divide(
+            dx_dy, 
+            displacement, 
+            out=np.ones(dx_dy.shape), 
+            where=displacement != 0
+        )
         # Magnitude of vector
         magnitude = self._cal_magnitude(displacement)
         # Scale vector
