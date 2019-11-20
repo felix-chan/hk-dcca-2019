@@ -451,7 +451,7 @@ class DiffSimRPB2(DiffSim):
         xys = self.particles.rename(
             columns={'id': 'id0', 'x': 'x0', 'y': 'y0'}
         )
-        xys['p'] = xys.apply(lambda row: nearest_points(Point(row['x0'], row['y0']), self._boundary)[1].xy, axis=1)
+        xys['p'] = xys.apply(lambda row: nearest_points(Point(row['x0'], row['y0']), self._boundary.exterior)[1].xy, axis=1)
         if self._debug:
             print('>>>> _cal_boundary_pts(): xys (1)')
             self._print_df_info(xys)
