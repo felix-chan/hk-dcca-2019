@@ -111,3 +111,8 @@ raw_json/
 
 # Edited files
 map_editor/edit/
+
+# QGIS setting
+raw_data/
+qgis/
+working/
