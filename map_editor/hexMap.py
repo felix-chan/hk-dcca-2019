@@ -97,7 +97,7 @@ class hexMap:
         
         return shapely.geometry.Polygon(hex_list)
 
-    def swap_position(self, old_x, old_y, new_x, new_y):
+    def swap_position(self, old_x, old_y, new_x, new_y, coord='wgs'):
         """
         Swap the location of two hexagon
         
@@ -165,7 +165,7 @@ class hexMap:
                     new_wgs_y = self.grid_df.geometry.iloc[df_new_id].y.values[0]
 
                     new_wgs_polygon = self._draw_hex(new_wgs_x, new_wgs_y,
-                                                     self.hex_width, 'wgs')
+                                                     self.hex_width, coord)
 
                     # Replace into table
                     self.hex_df.at[df_old_id, 'xid'] = new_x
