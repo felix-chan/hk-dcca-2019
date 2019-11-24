@@ -80,6 +80,8 @@ var x_moved = 0;
 var y_moved = 0;
 var circle_moved = null;
 var hex_layer = null;
+var popup = null;
+var ctrl_down = 0;
 
 L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -90,30 +92,51 @@ function onEachFeature(feature, layer) {
     //bind click
     layer.on('click', function (e) {
         // e = event
-        working_CACODE = e.target.feature.properties.CACODE;
-        $("#working_ca").html(working_CACODE);
-        $("#moving_target").html("No movement");
-        
-        var geom_box = e.target.feature.geometry;
+        if ((ctrl_down == 1) && (working_CACODE)){
+            var new_xid = e.target.feature.properties.xid;
+            var new_yid = e.target.feature.properties.yid;
 
-        if (selected_polygon !== null){
-            mymap.removeLayer(selected_polygon);
-            current_xid = null;
-            current_yid = null;
-        }
-        if (circle_moved !== null){
-            mymap.removeLayer(circle_moved);
+            x_moved = new_xid - current_xid;
+            y_moved = new_yid - current_yid;
+
+            movebox(0,0);
+        }else{
+            working_CACODE = e.target.feature.properties.CACODE;
+            $("#working_ca").html(working_CACODE);
+            $("#moving_target").html("No movement");
+            
+            var geom_box = e.target.feature.geometry;
+
+            if (selected_polygon !== null){
+                mymap.removeLayer(selected_polygon);
+                current_xid = null;
+                current_yid = null;
+            }
+            if (circle_moved !== null){
+                mymap.removeLayer(circle_moved);
+                x_moved = 0;
+                y_moved = 0;
+            }
+            var local_cord = geom_box.coordinates[0].map(x => [x[1], x[0]])
+            selected_polygon = L.polygon([local_cord], {color: 'yellow'}).addTo(mymap);
             x_moved = 0;
             y_moved = 0;
+            current_xid = e.target.feature.properties.xid;
+            current_yid = e.target.feature.properties.yid;
         }
-        var local_cord = geom_box.coordinates[0].map(x => [x[1], x[0]])
-        selected_polygon = L.polygon([local_cord], {color: 'yellow'}).addTo(mymap);
-        x_moved = 0;
-        y_moved = 0;
-        current_xid = e.target.feature.properties.xid;
-        current_yid = e.target.feature.properties.yid;
     });
 
+    layer.on('mouseover', function(e){
+        //open popup;
+        popup = L.popup()
+            .setLatLng(e.latlng) 
+            .setContent(e.target.feature.properties.CACODE)
+            .openOn(mymap);
+    });
+    layer.on('mouseout', function(e){
+        //close popup;
+        mymap.removeLayer(popup);
+    });
 }
 
 function movebox(x,y){
@@ -146,8 +169,8 @@ function movebox(x,y){
 
 function colorset(code){
     var varcol = code.charCodeAt(0) - 65;
-    var colorset = ["#d11141", "#f37735", "#00b159", "#00aedb", "#984EA3", "#ffc425", "#A65628"];
-    return colorset[varcol % 7];
+    var colorset = ["#d11141", "#f37735", "#00b159", "#00aedb", "#984EA3", "#ffc425"];
+    return colorset[varcol % 6];
 }
 
 function addJSON(data){
@@ -227,6 +250,16 @@ document.addEventListener('keydown', event => {
         case 'e':
             movebox(1,1);
             break;
+    }
+
+    if (event.keyCode == 17){
+        ctrl_down = 1;
+    }
+});
+
+document.addEventListener('keyup', event => {
+    if (event.keyCode == 17){
+        ctrl_down = 0;
     }
 });
 
