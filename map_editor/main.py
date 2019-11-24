@@ -16,6 +16,8 @@ import os
 if os.path.isfile('./edit/save_cache.geojson'):
     current_map_loc = './edit/save_cache.geojson'
 else:
+    if not os.path.exists('./edit/'):
+        os.makedirs('./edit/')
     current_map_loc = './geojson/hex_input.geojson'
 
 current_grid_loc = './geojson/hex_base_grid.geojson'
