@@ -54,7 +54,7 @@ body {
         <h1>GeoJSON Map Editor</h1>
         <p>District Code: <span id="working_ca">Not selected</span></p>
         <p>Move to position: <span id="moving_target">No movement</span></p>
-        <p><input type="button" value="Move" id="move_btn"></p>
+        <p><input type="button" value="Move (M)" id="move_btn"></p>
         <p>Click the region first, and use the following keys to select the target position.</p>
         <svg width="400" height="400">
                 <polygon points="350,200 275,329.9 125,329.9 50,200 125,70.1 275,70.1" style="fill:#ffffff;stroke:#cccccc;stroke-width:4" />
@@ -216,6 +216,36 @@ function loadGrid(data){
     ));
 }
 
+function submit(e){
+    var new_x = current_xid + x_moved;
+    var new_y = current_yid + y_moved;
+
+    if(xy_list[new_x][new_y] !== undefined){
+        $.post('/get_map/', {
+            from_x: current_xid, 
+            from_y: current_yid, 
+            to_x: new_x,
+            to_y: new_y
+            }).done(function(data){
+                if (circle_moved !== null){
+                    mymap.removeLayer(circle_moved);
+                    x_moved = 0;
+                    y_moved = 0;
+                    circle_moved = null;
+                }
+                if (selected_polygon !== null){
+                    mymap.removeLayer(selected_polygon);
+                    current_xid = null;
+                    current_yid = null;
+                    selected_polygon = null;
+                }
+                addJSON(data);
+            });
+    }else{
+        alert('Selected box out of boundary')
+    }
+}
+
 $.ajax({
     url: "./get_map/"
 }).done(function(data){
@@ -250,6 +280,9 @@ document.addEventListener('keydown', event => {
         case 'e':
             movebox(1,1);
             break;
+        case 'm':
+            submit(0);
+            break;
     }
 
     if (event.keyCode == 17){
@@ -264,33 +297,7 @@ document.addEventListener('keyup', event => {
 });
 
 $("#move_btn").click(function(e){
-    var new_x = current_xid + x_moved;
-    var new_y = current_yid + y_moved;
-
-    if(xy_list[new_x][new_y] !== undefined){
-        $.post('/get_map/', {
-            from_x: current_xid, 
-            from_y: current_yid, 
-            to_x: new_x,
-            to_y: new_y
-            }).done(function(data){
-                if (circle_moved !== null){
-                    mymap.removeLayer(circle_moved);
-                    x_moved = 0;
-                    y_moved = 0;
-                    circle_moved = null;
-                }
-                if (selected_polygon !== null){
-                    mymap.removeLayer(selected_polygon);
-                    current_xid = null;
-                    current_yid = null;
-                    selected_polygon = null;
-                }
-                addJSON(data);
-            });
-    }else{
-        alert('Selected box out of boundary')
-    }
+    submit(e);
 });
     </script>
 </body>
