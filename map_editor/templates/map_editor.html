@@ -81,7 +81,6 @@ var y_moved = 0;
 var circle_moved = null;
 var hex_layer = null;
 var popup = null;
-var ctrl_down = 0;
 
 L.tileLayer(
     "https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png",
@@ -92,7 +91,7 @@ function onEachFeature(feature, layer) {
     //bind click
     layer.on('click', function (e) {
         // e = event
-        if ((ctrl_down == 1) && (working_CACODE)){
+        if ((e.originalEvent.shiftKey) && (working_CACODE)){
             var new_xid = e.target.feature.properties.xid;
             var new_yid = e.target.feature.properties.yid;
 
@@ -283,10 +282,6 @@ document.addEventListener('keydown', event => {
         case 'm':
             submit(0);
             break;
-    }
-
-    if (event.keyCode == 17){
-        ctrl_down = 1;
     }
 });
 
