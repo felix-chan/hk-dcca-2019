@@ -6,8 +6,21 @@ It is a map editor to fine-tune the position of region on map. The files inside 
 
 Run the following code to see the effect of editor:
 
+Unix Bash (Linux, Mac, etc.):
 ```sh
+export FLASK_APP=main.py
+python -m flask run
+```
+
+Windows CMD:
+```cmd
 set FLASK_APP=main.py
+python -m flask run
+```
+
+Windows PowerShell:
+```sh
+$env:FLASK_APP = "main"
 python -m flask run
 ```
 
