@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from shapely.geometry import Point, Polygon
+from shapely.ops import nearest_points
 
 
 #%%
@@ -21,7 +22,12 @@ class DiffVec(object):
         dx_dy = np.array([x0 - x, y0 - y])
         displacement = np.sqrt(np.sum(dx_dy**2))
         # Normalise
-        direction = dx_dy / displacement
+        direction = np.divide(
+            dx_dy, 
+            displacement, 
+            out=np.ones(dx_dy.shape), 
+            where=displacement != 0
+        )
         # Magnitude of vector
         magnitude = self._cal_magnitude(displacement)
         # Scale vector
@@ -201,6 +207,17 @@ class DiffSim(object):
         updated_coords = updated_coords.drop(columns=['dummy_key'])
         return updated_coords
     
+    @staticmethod
+    def _print_df_info(df):
+        print(df.shape)
+        print(df.head())
+    
+    @staticmethod
+    def _distance_to_boundary(x, y, boundary):
+        pt = Point([x, y])
+        dist = boundary.exterior.distance(pt)
+        return dist
+    
     def _add_log(self):
         if self._tracking > 0 and (self._n_iter % self._tracking) == 0:
             if self._debug:
@@ -213,14 +230,14 @@ class DiffSim(object):
         df['dx'] = 0
         df['dy'] = 0
         if self._debug:
-            print('>>>> _cal_update_vec(): df.head()')
-            print(df.head())
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         update_vec = df\
             .groupby(['id0'], as_index=False)\
             .agg({'dx': np.sum, 'dy': np.sum})
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head()')
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec')
+            self._print_df_info(update_vec)
         # Tidy up
         update_vec = update_vec.rename(columns={'id0': 'id'})
         update_vec = update_vec.sort_values(by=['id'])
@@ -231,8 +248,8 @@ class DiffSim(object):
         # Update coordinates
         updated_coords = pd.merge(self._particles, self._update_vec, on=['id'])
         if self._debug:
-            print('>>>> _update_coords(): updated_coords.head()')
-            print(updated_coords.head())
+            print('>>>> _update_coords(): updated_coords')
+            self._print_df_info(updated_coords)
         updated_coords['x'] += updated_coords['dx'].values
         updated_coords['y'] += updated_coords['dy'].values
         # Tidy up
@@ -265,24 +282,27 @@ class DiffSimUnb(DiffSim):
         DiffSim.__init__(self, particles, bonding, diff_func, tracking, debug)
     
     def _cal_update_vec(self, df):
+        if self._debug:
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         vec = df.apply(
             lambda row: self._diff_func[row['type']].cal_vec(row['x0'], row['y0'], row['x1'], row['y1']), 
             axis=1
         )
         if self._debug:
-            print('>>>> _cal_update_vec(): vec.head()')
-            print(vec.head())
+            print('>>>> _cal_update_vec(): vec')
+            self._print_df_info(vec)
         df['dx'] = vec.str[0]
         df['dy'] = vec.str[1]
         if self._debug:
-            print('>>>> _cal_update_vec(): df.head()')
-            print(df.head())
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         update_vec = df\
             .groupby(['id0'], as_index=False)\
             .agg({'dx': np.sum, 'dy': np.sum})
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head()')
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec')
+            self._print_df_info(update_vec)
         # Tidy up
         update_vec = update_vec.rename(columns={'id0': 'id'})
         update_vec = update_vec.sort_values(by=['id'])
@@ -297,22 +317,24 @@ class DiffSimRP(DiffSim):
         self._alpha = alpha
     
     def _cal_update_vec(self, df):
+        if self._debug:
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         vec = df.apply(
             lambda row: self._diff_func[row['type']].cal_vec(row['x0'], row['y0'], row['x1'], row['y1']), 
             axis=1
         )
         if self._debug:
-            print('>>>> _cal_update_vec(): vec.head()')
-            print(vec.head())
+            print('>>>> _cal_update_vec(): vec')
+            self._print_df_info(vec)
         df['v_x'] = vec.str[0]
         df['v_y'] = vec.str[1]
         # Inter points constraints
         df['tolerance'] = np.sqrt((df['x1'].values - df['x0'].values)**2 + (df['y1'].values - df['y0'].values)**2)
         df['tolerance'] *= self._alpha
         if self._debug:
-            print('>>>> _cal_update_vec(): df.head()')
-            print(df.shape)
-            print(df.head())
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         update_vec = df\
             .groupby(['id0'], as_index=False)\
             .agg({'v_x': np.sum, 'v_y': np.sum, 'tolerance': np.min})
@@ -325,26 +347,23 @@ class DiffSimRP(DiffSim):
         )
         update_vec['fac1'] = np.where(update_vec['fac1'].values > 1, 1, update_vec['fac1'].values)
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head() (Inter points constraints)')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec (Inter points constraints)')
+            self._print_df_info(update_vec)
         # Adjustment
         update_vec['fac'] = update_vec['fac1'].values
         update_vec['dx'] = update_vec['v_x'] * update_vec['fac'].values
         update_vec['dy'] = update_vec['v_y'] * update_vec['fac'].values
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head()')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec')
+            self._print_df_info(update_vec)
         # Tidy up
         update_vec = update_vec.rename(columns={'id0': 'id'})
         update_vec = update_vec.sort_values(by=['id'])
         update_vec = update_vec.reset_index(drop=True)
         self._update_vec = update_vec
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head() (Tidy up)')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec (Tidy up)')
+            self._print_df_info(update_vec)
 
 
 # Inter points distance and boundary restricted
@@ -354,28 +373,25 @@ class DiffSimRPB(DiffSim):
         self._boundary = boundary
         self._alpha = alpha
     
-    def _distance_to_boundary(self, x, y):
-        pt = Point([x, y])
-        dist = self._boundary.exterior.distance(pt)
-        return dist
-    
     def _cal_update_vec(self, df):
+        if self._debug:
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         vec = df.apply(
             lambda row: self._diff_func[row['type']].cal_vec(row['x0'], row['y0'], row['x1'], row['y1']), 
             axis=1
         )
         if self._debug:
-            print('>>>> _cal_update_vec(): vec.head()')
-            print(vec.head())
+            print('>>>> _cal_update_vec(): vec')
+            self._print_df_info(vec)
         df['v_x'] = vec.str[0]
         df['v_y'] = vec.str[1]
         # Inter points constraints
         df['tolerance'] = np.sqrt((df['x1'].values - df['x0'].values)**2 + (df['y1'].values - df['y0'].values)**2)
         df['tolerance'] *= self._alpha
         if self._debug:
-            print('>>>> _cal_update_vec(): df.head()')
-            print(df.shape)
-            print(df.head())
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
         update_vec = df\
             .groupby(['id0'], as_index=False)\
             .agg({'v_x': np.sum, 'v_y': np.sum, 'tolerance': np.min})
@@ -388,13 +404,14 @@ class DiffSimRPB(DiffSim):
         )
         update_vec['fac1'] = np.where(update_vec['fac1'].values > 1, 1, update_vec['fac1'].values)
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head() (Inter points constraints)')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec (Inter points constraints)')
+            self._print_df_info(update_vec)
         # Boundary constraints
         particles = self.particles.rename(columns={'id': 'id0', 'x': 'x0', 'y': 'y0'})
         update_vec = update_vec.merge(particles, on=['id0'], how='outer')
-        update_vec['dist_to_bdry'] = update_vec.apply(lambda row: self._distance_to_boundary(row['x0'], row['y0']), axis=1)
+        update_vec['dist_to_bdry'] = update_vec.apply(
+            lambda row: self._distance_to_boundary(row['x0'], row['y0'], self._boundary), axis=1
+        )
         update_vec['fac2'] = np.divide(
             update_vec['dist_to_bdry'].values, 
             update_vec['v_norm'].values, 
@@ -403,24 +420,115 @@ class DiffSimRPB(DiffSim):
         )
         update_vec['fac2'] = np.where(update_vec['fac2'].values > 1, 1, update_vec['fac2'].values)
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head() (Boundary constraints)')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec (Boundary constraints)')
+            self._print_df_info(update_vec)
         # Adjustment
         update_vec['fac'] = update_vec[['fac1', 'fac2']].apply(min, axis=1)
         update_vec['dx'] = update_vec['v_x'] * update_vec['fac'].values
         update_vec['dy'] = update_vec['v_y'] * update_vec['fac'].values
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head() (Adjustment)')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec (Adjustment)')
+            self._print_df_info(update_vec)
         # Tidy up
         update_vec = update_vec.rename(columns={'id0': 'id'})
         update_vec = update_vec.sort_values(by=['id'])
         update_vec = update_vec.reset_index(drop=True)
         self._update_vec = update_vec
         if self._debug:
-            print('>>>> _cal_update_vec(): update_vec.head() (Tidy up)')
-            print(update_vec.shape)
-            print(update_vec.head())
+            print('>>>> _cal_update_vec(): update_vec (Tidy up)')
+            self._print_df_info(update_vec)
+
+
+# Inter points distance and boundary restricted with boundary force
+class DiffSimRPB2(DiffSim):
+    def __init__(self, particles, bonding, boundary, diff_func, bdry_func_key, alpha=0.3, tracking=0, debug=False):
+        DiffSim.__init__(self, particles, bonding, diff_func, tracking, debug)
+        self._boundary = boundary
+        self._bdry_func_key = bdry_func_key
+        self._alpha = alpha
+    
+    def _cal_boundary_pts(self):
+        xys = self.particles.rename(
+            columns={'id': 'id0', 'x': 'x0', 'y': 'y0'}
+        )
+        xys['p'] = xys.apply(lambda row: nearest_points(Point(row['x0'], row['y0']), self._boundary.exterior)[1].xy, axis=1)
+        if self._debug:
+            print('>>>> _cal_boundary_pts(): xys (1)')
+            self._print_df_info(xys)
+        xys['id1'] = -1
+        xys['x1'] = xys['p'].str[0].str[0]
+        xys['y1'] = xys['p'].str[1].str[0]
+        xys['type'] = self._bdry_func_key
+        xys = xys[['id0', 'id1', 'type', 'x0', 'y0', 'x1', 'y1']]
+        if self._debug:
+            print('>>>> _cal_boundary_pts(): xys (2)')
+            self._print_df_info(xys)
+        return xys
+    
+    def _cal_update_vec(self, df):
+        df = pd.concat([df, self._cal_boundary_pts()], axis=0, ignore_index=True)
+        if self._debug:
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
+        vec = df.apply(
+            lambda row: self._diff_func[row['type']].cal_vec(row['x0'], row['y0'], row['x1'], row['y1']), 
+            axis=1
+        )
+        if self._debug:
+            print('>>>> _cal_update_vec(): vec')
+            self._print_df_info(vec)
+        df['v_x'] = vec.str[0]
+        df['v_y'] = vec.str[1]
+        # Inter points constraints
+        df['tolerance'] = np.sqrt((df['x1'].values - df['x0'].values)**2 + (df['y1'].values - df['y0'].values)**2)
+        df['tolerance'] *= self._alpha
+        df.loc[df['id1'].values == -1, 'tolerance'] = np.inf
+        if self._debug:
+            print('>>>> _cal_update_vec(): df')
+            self._print_df_info(df)
+        update_vec = df\
+            .groupby(['id0'], as_index=False)\
+            .agg({'v_x': np.sum, 'v_y': np.sum, 'tolerance': np.min})
+        update_vec['v_norm'] = np.sqrt(update_vec['v_x'].values**2 + update_vec['v_y'].values**2)
+        update_vec['fac1'] = np.divide(
+            update_vec['tolerance'].values, 
+            update_vec['v_norm'].values, 
+            out=np.ones(update_vec.shape[0]), 
+            where=update_vec['v_norm'].values != 0
+        )
+        update_vec['fac1'] = np.where(update_vec['fac1'].values > 1, 1, update_vec['fac1'].values)
+        if self._debug:
+            print('>>>> _cal_update_vec(): update_vec (Inter points constraints)')
+            self._print_df_info(update_vec)
+        # Boundary constraints
+        particles = self.particles.rename(columns={'id': 'id0', 'x': 'x0', 'y': 'y0'})
+        update_vec = update_vec.merge(particles, on=['id0'], how='outer')
+        update_vec['dist_to_bdry'] = update_vec.apply(
+            lambda row: self._distance_to_boundary(row['x0'], row['y0'], self._boundary), axis=1
+        )
+        update_vec['fac2'] = np.divide(
+            update_vec['dist_to_bdry'].values, 
+            update_vec['v_norm'].values, 
+            out=np.ones(update_vec.shape[0]), 
+            where=update_vec['v_norm'].values != 0
+        )
+        update_vec['fac2'] = np.where(update_vec['fac2'].values > 1, 1, update_vec['fac2'].values)
+        if self._debug:
+            print('>>>> _cal_update_vec(): update_vec (Boundary constraints)')
+            self._print_df_info(update_vec)
+        # Adjustment
+        update_vec['fac'] = update_vec[['fac1', 'fac2']].apply(min, axis=1)
+        update_vec['dx'] = update_vec['v_x'] * update_vec['fac'].values
+        update_vec['dy'] = update_vec['v_y'] * update_vec['fac'].values
+        if self._debug:
+            print('>>>> _cal_update_vec(): update_vec (Adjustment)')
+            self._print_df_info(update_vec)
+        # Tidy up
+        update_vec = update_vec.rename(columns={'id0': 'id'})
+        update_vec = update_vec.sort_values(by=['id'])
+        update_vec = update_vec.reset_index(drop=True)
+        self._update_vec = update_vec
+        if self._debug:
+            print('>>>> _cal_update_vec(): update_vec (Tidy up)')
+            self._print_df_info(update_vec)
 
